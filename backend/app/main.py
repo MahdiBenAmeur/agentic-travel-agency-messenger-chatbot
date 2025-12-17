@@ -5,7 +5,7 @@ from routes.trip import router as trips_router
 from routes.client import router as clients_router
 from routes.booking import router as bookings_router
 from routes.message import router as messages_router
-
+from routes.messnger_webhooks import router as messages_webhooks_router
 app = FastAPI()
 
 app.add_middleware(
@@ -20,6 +20,7 @@ app.include_router(trips_router)
 app.include_router(clients_router)
 app.include_router(bookings_router)
 app.include_router(messages_router)
+app.include_router(messages_webhooks_router)
 
 if __name__ == "__main__":
     import uvicorn
