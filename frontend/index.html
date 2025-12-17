@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel Agency Admin</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Travel Agency Admin</h1>
+            <div class="bot-toggle">
+                <label>
+                    <input type="checkbox" id="botEnabled" checked>
+                    <span>Chatbot Enabled</span>
+                </label>
+            </div>
+        </header>
+
+        <nav>
+            <button onclick="showTab('voyages')" class="active">Voyages</button>
+            <button onclick="showTab('bookings')">Bookings</button>
+            <button onclick="showTab('analytics')">Analytics</button>
+            <button onclick="showTab('chatbot')">Admin Chat</button>
+        </nav>
+
+        <!-- Voyages Tab -->
+        <div id="voyages" class="tab active">
+            <h2>Manage Voyages</h2>
+            <form id="voyageForm">
+                <input type="hidden" id="voyageId">
+                <input type="text" id="destination" placeholder="Destination" required>
+                <input type="date" id="startDate" required>
+                <input type="date" id="endDate" required>
+                <input type="number" id="price" placeholder="Price" required>
+                <input type="number" id="capacity" placeholder="Capacity" required>
+                <button type="submit">Add Voyage</button>
+            </form>
+            <table id="voyagesTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Destination</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Price</th>
+                        <th>Capacity</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Bookings Tab -->
+        <div id="bookings" class="tab">
+            <h2>Bookings</h2>
+            <table id="bookingsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Client</th>
+                        <th>Voyage</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analytics" class="tab">
+            <h2>Analytics</h2>
+            <div class="stats">
+                <div class="stat-card">
+                    <h3>Total Bookings</h3>
+                    <p id="totalBookings">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Active Voyages</h3>
+                    <p id="activeVoyages">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Revenue</h3>
+                    <p id="totalRevenue">$0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Conversations</h3>
+                    <p id="totalConversations">0</p>
+                </div>
+            </div>
+            <div class="chart">
+                <h3>Bookings Over Time</h3>
+                <canvas id="bookingsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Admin Chatbot Tab -->
+        <div id="chatbot" class="tab">
+            <h2>Admin Chatbot</h2>
+            <div id="chatMessages"></div>
+            <form id="chatForm">
+                <input type="text" id="chatInput" placeholder="Ask about bookings, voyages, etc..." required>
+                <button type="submit">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="api.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
