@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from dbmodels.booking import Booking
+from dbmodels.trip import Trip
 
 
 VALID_STATUSES = {"pending", "confirmed", "cancelled"}
@@ -216,7 +217,13 @@ def set_booking_status(db: Session, booking_id: int, status: str) -> Booking | N
 
 def confirm_booking(db: Session, booking_id: int) -> Booking | None:
     """
-    Mark a booking as confirmed.
+    Mark a booking as confirmed and decrement trip available seats
+    by booking.passengers_count.
+
+    Rules:
+        - Only transitions pending -> confirmed.
+        - If the trip has available_seats as NULL, no seat decrement is performed.
+        - If there are not enough seats, raises ValueError.
 
     Args:
         db: SQLAlchemy session.
@@ -224,8 +231,34 @@ def confirm_booking(db: Session, booking_id: int) -> Booking | None:
 
     Returns:
         Updated Booking if found, otherwise None.
+
+    Raises:
+        ValueError: if booking is not pending, trip not found, or not enough seats.
     """
-    return set_booking_status(db, booking_id, "confirmed")
+    booking = get_booking_by_id(db, booking_id)
+    if not booking:
+        return None
+
+    if booking.status != "pending":
+        raise ValueError("only pending bookings can be confirmed")
+
+    trip = db.query(Trip).filter(Trip.id == booking.trip_id).first()
+    if not trip:
+        raise ValueError("trip not found for this booking")
+
+    if trip.available_seats is not None:
+        needed = booking.passengers_count or 0
+        if needed <= 0:
+            raise ValueError("invalid passengers_count on booking")
+        if trip.available_seats - needed < 0:
+            raise ValueError("not enough available seats")
+        trip.available_seats = trip.available_seats - needed
+
+    booking.status = "confirmed"
+
+    db.commit()
+    db.refresh(booking)
+    return booking
 
 
 def cancel_booking(db: Session, booking_id: int) -> Booking | None:
