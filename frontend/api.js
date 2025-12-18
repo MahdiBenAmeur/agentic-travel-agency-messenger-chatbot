@@ -67,6 +67,27 @@ const api = {
         return response.json();
     },
     
+    async createBooking(booking) {
+        const response = await fetch(`${API_BASE}/bookings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(booking)
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to create booking');
+        }
+        return response.json();
+    },
+    
+    async confirmBooking(id) {
+        const response = await fetch(`${API_BASE}/bookings/${id}/confirm`, {
+            method: 'POST'
+        });
+        if (!response.ok) throw new Error('Failed to confirm booking');
+        return response.json();
+    },
+    
     async cancelBooking(id) {
         const response = await fetch(`${API_BASE}/bookings/${id}/cancel`, {
             method: 'POST'
@@ -82,6 +103,41 @@ const api = {
         return response.json();
     },
 
+    async createClient(client) {
+        const response = await fetch(`${API_BASE}/clients`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(client)
+        });
+        if (!response.ok) throw new Error('Failed to create client');
+        return response.json();
+    },
+
+    async updateClient(id, client) {
+        const response = await fetch(`${API_BASE}/clients/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(client)
+        });
+        if (!response.ok) throw new Error('Failed to update client');
+        return response.json();
+    },
+
+    async deleteClient(id) {
+        const response = await fetch(`${API_BASE}/clients/${id}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Failed to delete client');
+        return response.json();
+    },
+
+    // Messages
+    async getRecentMessages(clientId, limit = 20) {
+        const response = await fetch(`${API_BASE}/messages/recent/${clientId}?limit=${limit}`);
+        if (!response.ok) throw new Error('Failed to fetch messages');
+        return response.json();
+    },
+
     // Analytics (placeholder - you'll need to implement this endpoint)
     async getAnalytics() {
         try {
@@ -93,15 +149,43 @@ const api = {
             ]);
             
             const activeTrips = trips.filter(t => t.is_active).length;
+            
+            // Calculate revenue by matching booking trip_id with actual trips
             const totalRevenue = bookings
                 .filter(b => b.status === 'confirmed')
-                .reduce((sum, b) => sum + (b.trip?.price || 0) * (b.passengers_count || 1), 0);
+                .reduce((sum, b) => {
+                    // Find the trip by ID to get the price
+                    const trip = trips.find(t => t.id === b.trip_id);
+                    const tripPrice = trip?.price || 0;
+                    const passengers = b.passengers_count || 1;
+                    return sum + (tripPrice * passengers);
+                }, 0);
+            
+            // Count actual conversations by checking which clients have messages
+            let conversationCount = 0;
+            try {
+                // Get messages for each client to count active conversations
+                const messageChecks = await Promise.all(
+                    clients.map(async (client) => {
+                        try {
+                            const messages = await this.getRecentMessages(client.id, 1);
+                            return messages.length > 0 ? 1 : 0;
+                        } catch {
+                            return 0;
+                        }
+                    })
+                );
+                conversationCount = messageChecks.reduce((sum, count) => sum + count, 0);
+            } catch (error) {
+                console.log('Could not fetch message data, using client count as fallback');
+                conversationCount = clients.length;
+            }
             
             return {
                 total_bookings: bookings.length,
                 active_voyages: activeTrips,
                 total_revenue: totalRevenue,
-                total_conversations: clients.length // Using clients as proxy for conversations
+                total_conversations: conversationCount
             };
         } catch (error) {
             console.error('Analytics error:', error);

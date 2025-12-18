@@ -20,6 +20,7 @@
 
         <nav>
             <button onclick="showTab('voyages')" class="active">Voyages</button>
+            <button onclick="showTab('clients')">Clients</button>
             <button onclick="showTab('bookings')">Bookings</button>
             <button onclick="showTab('analytics')">Analytics</button>
             <button onclick="showTab('chatbot')">Admin Chat</button>
@@ -53,17 +54,57 @@
             </table>
         </div>
 
+        <!-- Clients Tab -->
+        <div id="clients" class="tab">
+            <h2>Manage Clients</h2>
+            <form id="clientForm">
+                <input type="hidden" id="clientId">
+                <input type="text" id="clientName" placeholder="Client Name" required>
+                <input type="text" id="clientPsid" placeholder="Messenger PSID" required>
+                <input type="tel" id="clientPhone" placeholder="Phone Number">
+                <input type="text" id="clientNationalId" placeholder="National ID">
+                <button type="submit">Add Client</button>
+            </form>
+            <table id="clientsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Messenger PSID</th>
+                        <th>Phone</th>
+                        <th>National ID</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
         <!-- Bookings Tab -->
         <div id="bookings" class="tab">
-            <h2>Bookings</h2>
+            <h2>Manage Bookings</h2>
+            <form id="bookingForm">
+                <select id="bookingClient" required>
+                    <option value="">Select Client</option>
+                </select>
+                <select id="bookingTrip" required>
+                    <option value="">Select Trip</option>
+                </select>
+                <input type="number" id="bookingPassengers" placeholder="Number of Passengers" min="1" value="1" required>
+                <input type="tel" id="bookingPhone" placeholder="Contact Phone">
+                <textarea id="bookingNotes" placeholder="Notes (optional)" rows="2"></textarea>
+                <button type="submit">Create Booking</button>
+            </form>
             <table id="bookingsTable">
                 <thead>
                     <tr>
                         <th>ID</th>
                         <th>Client</th>
-                        <th>Voyage</th>
-                        <th>Date</th>
+                        <th>Trip</th>
+                        <th>Passengers</th>
+                        <th>Phone</th>
                         <th>Status</th>
+                        <th>Created</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -92,9 +133,15 @@
                     <p id="totalConversations">0</p>
                 </div>
             </div>
-            <div class="chart">
-                <h3>Bookings Over Time</h3>
-                <canvas id="bookingsChart"></canvas>
+            <div class="charts-container">
+                <div class="chart">
+                    <h3>Bookings Over Time</h3>
+                    <canvas id="bookingsChart"></canvas>
+                </div>
+                <div class="chart">
+                    <h3>Revenue Over Time</h3>
+                    <canvas id="revenueChart"></canvas>
+                </div>
             </div>
         </div>
 
