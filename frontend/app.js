@@ -72,20 +72,27 @@ async function loadVoyages() {
 
 function renderVoyages() {
     const tbody = document.querySelector('#voyagesTable tbody');
-    tbody.innerHTML = voyages.map(v => `
+    tbody.innerHTML = voyages.map(v => {
+        // Handle both frontend format and backend format
+        const startDate = v.start_date || (v.departure_time ? v.departure_time.split('T')[0] : '');
+        const endDate = v.end_date || (v.arrival_time ? v.arrival_time.split('T')[0] : '');
+        const capacity = v.capacity || v.available_seats || 0;
+        
+        return `
         <tr>
             <td>${v.id}</td>
             <td>${v.destination}</td>
-            <td>${v.start_date}</td>
-            <td>${v.end_date}</td>
-            <td>$${v.price}</td>
-            <td>${v.capacity}</td>
+            <td>${startDate}</td>
+            <td>${endDate}</td>
+            <td>$${v.price || 0}</td>
+            <td>${capacity}</td>
             <td>
                 <button class="btn-edit" onclick="editVoyage(${v.id})">Edit</button>
                 <button class="btn-delete" onclick="deleteVoyage(${v.id})">Delete</button>
             </td>
         </tr>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function editVoyage(id) {
@@ -94,10 +101,15 @@ function editVoyage(id) {
     
     document.getElementById('voyageId').value = voyage.id;
     document.getElementById('destination').value = voyage.destination;
-    document.getElementById('startDate').value = voyage.start_date;
-    document.getElementById('endDate').value = voyage.end_date;
-    document.getElementById('price').value = voyage.price;
-    document.getElementById('capacity').value = voyage.capacity;
+    
+    // Handle both frontend and backend date formats
+    const startDate = voyage.start_date || (voyage.departure_time ? voyage.departure_time.split('T')[0] : '');
+    const endDate = voyage.end_date || (voyage.arrival_time ? voyage.arrival_time.split('T')[0] : '');
+    
+    document.getElementById('startDate').value = startDate;
+    document.getElementById('endDate').value = endDate;
+    document.getElementById('price').value = voyage.price || 0;
+    document.getElementById('capacity').value = voyage.capacity || voyage.available_seats || 0;
 }
 
 async function deleteVoyage(id) {
@@ -130,12 +142,18 @@ async function loadBookings() {
 
 function renderBookings() {
     const tbody = document.querySelector('#bookingsTable tbody');
-    tbody.innerHTML = bookings.map(b => `
+    tbody.innerHTML = bookings.map(b => {
+        // Handle backend data structure
+        const clientName = b.client?.name || b.client || 'Unknown';
+        const tripDest = b.trip?.destination || b.voyage || 'N/A';
+        const bookingDate = b.date || (b.created_at ? new Date(b.created_at).toLocaleDateString() : 'N/A');
+        
+        return `
         <tr>
             <td>${b.id}</td>
-            <td>${b.client}</td>
-            <td>${b.voyage}</td>
-            <td>${b.date}</td>
+            <td>${clientName}</td>
+            <td>${tripDest}</td>
+            <td>${bookingDate}</td>
             <td>${b.status}</td>
             <td>
                 ${b.status !== 'cancelled' ? 
@@ -144,7 +162,8 @@ function renderBookings() {
                 }
             </td>
         </tr>
-    `).join('');
+        `;
+    }).join('');
 }
 
 async function cancelBooking(id) {
