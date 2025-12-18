@@ -10,7 +10,7 @@ DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-
+PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
 
 
 
