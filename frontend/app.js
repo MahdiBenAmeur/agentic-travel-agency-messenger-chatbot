@@ -1,6 +1,7 @@
 // State
 let voyages = [];
 let bookings = [];
+let clients = [];
 
 // Tab Navigation
 function showTab(tabName) {
@@ -11,6 +12,7 @@ function showTab(tabName) {
     event.target.classList.add('active');
     
     if (tabName === 'voyages') loadVoyages();
+    if (tabName === 'clients') loadClients();
     if (tabName === 'bookings') loadBookings();
     if (tabName === 'analytics') loadAnalytics();
 }
@@ -72,20 +74,27 @@ async function loadVoyages() {
 
 function renderVoyages() {
     const tbody = document.querySelector('#voyagesTable tbody');
-    tbody.innerHTML = voyages.map(v => `
+    tbody.innerHTML = voyages.map(v => {
+        // Handle both frontend format and backend format
+        const startDate = v.start_date || (v.departure_time ? v.departure_time.split('T')[0] : '');
+        const endDate = v.end_date || (v.arrival_time ? v.arrival_time.split('T')[0] : '');
+        const capacity = v.capacity || v.available_seats || 0;
+        
+        return `
         <tr>
             <td>${v.id}</td>
             <td>${v.destination}</td>
-            <td>${v.start_date}</td>
-            <td>${v.end_date}</td>
-            <td>$${v.price}</td>
-            <td>${v.capacity}</td>
+            <td>${startDate}</td>
+            <td>${endDate}</td>
+            <td>$${v.price || 0}</td>
+            <td>${capacity}</td>
             <td>
                 <button class="btn-edit" onclick="editVoyage(${v.id})">Edit</button>
                 <button class="btn-delete" onclick="deleteVoyage(${v.id})">Delete</button>
             </td>
         </tr>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function editVoyage(id) {
@@ -94,10 +103,15 @@ function editVoyage(id) {
     
     document.getElementById('voyageId').value = voyage.id;
     document.getElementById('destination').value = voyage.destination;
-    document.getElementById('startDate').value = voyage.start_date;
-    document.getElementById('endDate').value = voyage.end_date;
-    document.getElementById('price').value = voyage.price;
-    document.getElementById('capacity').value = voyage.capacity;
+    
+    // Handle both frontend and backend date formats
+    const startDate = voyage.start_date || (voyage.departure_time ? voyage.departure_time.split('T')[0] : '');
+    const endDate = voyage.end_date || (voyage.arrival_time ? voyage.arrival_time.split('T')[0] : '');
+    
+    document.getElementById('startDate').value = startDate;
+    document.getElementById('endDate').value = endDate;
+    document.getElementById('price').value = voyage.price || 0;
+    document.getElementById('capacity').value = voyage.capacity || voyage.available_seats || 0;
 }
 
 async function deleteVoyage(id) {
@@ -112,39 +126,206 @@ async function deleteVoyage(id) {
     }
 }
 
+// Clients Management
+document.getElementById('clientForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const client = {
+        name: document.getElementById('clientName').value,
+        messenger_psid: document.getElementById('clientPsid').value,
+        phone_number: document.getElementById('clientPhone').value || null,
+        national_id: document.getElementById('clientNationalId').value || null
+    };
+    
+    const clientId = document.getElementById('clientId').value;
+    
+    try {
+        if (clientId) {
+            await api.updateClient(clientId, client);
+        } else {
+            await api.createClient(client);
+        }
+        e.target.reset();
+        document.getElementById('clientId').value = '';
+        loadClients();
+    } catch (error) {
+        console.error('Error saving client:', error);
+        alert('Failed to save client. Check the console for details.');
+    }
+});
+
+async function loadClients() {
+    try {
+        clients = await api.getClients();
+        renderClients();
+    } catch (error) {
+        console.error('Error loading clients:', error);
+        clients = [];
+        renderClients();
+    }
+}
+
+function renderClients() {
+    const tbody = document.querySelector('#clientsTable tbody');
+    tbody.innerHTML = clients.map(c => `
+        <tr>
+            <td>${c.id}</td>
+            <td>${c.name || 'N/A'}</td>
+            <td>${c.messenger_psid}</td>
+            <td>${c.phone_number || 'N/A'}</td>
+            <td>${c.national_id || 'N/A'}</td>
+            <td>
+                <button class="btn-edit" onclick="editClient(${c.id})">Edit</button>
+                <button class="btn-delete" onclick="deleteClient(${c.id})">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function editClient(id) {
+    const client = clients.find(c => c.id === id);
+    if (!client) return;
+    
+    document.getElementById('clientId').value = client.id;
+    document.getElementById('clientName').value = client.name || '';
+    document.getElementById('clientPsid').value = client.messenger_psid;
+    document.getElementById('clientPhone').value = client.phone_number || '';
+    document.getElementById('clientNationalId').value = client.national_id || '';
+    
+    // Scroll to form
+    document.getElementById('clientForm').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function deleteClient(id) {
+    if (!confirm('Delete this client? This will also delete their bookings and messages.')) return;
+    
+    try {
+        await api.deleteClient(id);
+        loadClients();
+    } catch (error) {
+        console.error('Error deleting client:', error);
+        alert('Failed to delete client. Backend may not be running.');
+    }
+}
+
 // Bookings Management
+document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const booking = {
+        client_id: parseInt(document.getElementById('bookingClient').value),
+        trip_id: parseInt(document.getElementById('bookingTrip').value),
+        passengers_count: parseInt(document.getElementById('bookingPassengers').value),
+        contact_phone: document.getElementById('bookingPhone').value || null,
+        notes: document.getElementById('bookingNotes').value || null
+    };
+    
+    try {
+        await api.createBooking(booking);
+        e.target.reset();
+        loadBookings();
+        alert('Booking created successfully!');
+    } catch (error) {
+        console.error('Error creating booking:', error);
+        alert('Failed to create booking: ' + error.message);
+    }
+});
+
 async function loadBookings() {
     try {
         bookings = await api.getBookings();
+        
+        // Also load clients and trips for the dropdowns
+        if (!clients.length) {
+            clients = await api.getClients();
+        }
+        if (!voyages.length) {
+            voyages = await api.getVoyages();
+        }
+        
+        populateBookingDropdowns();
         renderBookings();
     } catch (error) {
         console.error('Error loading bookings:', error);
-        // Show mock data if backend is not available
-        bookings = [
-            { id: 1, client: 'John Doe', voyage: 'Paris', date: '2025-06-01', status: 'confirmed' },
-            { id: 2, client: 'Jane Smith', voyage: 'Tokyo', date: '2025-07-15', status: 'pending' }
-        ];
+        bookings = [];
         renderBookings();
     }
 }
 
+function populateBookingDropdowns() {
+    // Populate clients dropdown
+    const clientSelect = document.getElementById('bookingClient');
+    clientSelect.innerHTML = '<option value="">Select Client</option>' +
+        clients.map(c => `<option value="${c.id}">${c.name || c.messenger_psid}</option>`).join('');
+    
+    // Populate trips dropdown
+    const tripSelect = document.getElementById('bookingTrip');
+    tripSelect.innerHTML = '<option value="">Select Trip</option>' +
+        voyages.filter(v => v.is_active).map(v => 
+            `<option value="${v.id}">${v.destination} - $${v.price} (${v.available_seats} seats)</option>`
+        ).join('');
+}
+
 function renderBookings() {
     const tbody = document.querySelector('#bookingsTable tbody');
-    tbody.innerHTML = bookings.map(b => `
+    tbody.innerHTML = bookings.map(b => {
+        // Map IDs to actual client and trip data
+        let clientName = 'Unknown';
+        if (b.client) {
+            // Backend returned full client object
+            clientName = b.client.name || b.client.messenger_psid || 'Unknown';
+        } else if (b.client_id) {
+            // Only have client_id, find in our clients array
+            const client = clients.find(c => c.id === b.client_id);
+            clientName = client ? (client.name || client.messenger_psid) : `Client #${b.client_id}`;
+        }
+        
+        let tripDest = 'N/A';
+        if (b.trip) {
+            // Backend returned full trip object
+            tripDest = b.trip.destination;
+        } else if (b.trip_id) {
+            // Only have trip_id, find in our voyages array
+            const trip = voyages.find(v => v.id === b.trip_id);
+            tripDest = trip ? trip.destination : `Trip #${b.trip_id}`;
+        }
+        
+        const bookingDate = b.created_at ? new Date(b.created_at).toLocaleDateString() : 'N/A';
+        const passengers = b.passengers_count || 1;
+        const phone = b.contact_phone || 'N/A';
+        
+        return `
         <tr>
             <td>${b.id}</td>
-            <td>${b.client}</td>
-            <td>${b.voyage}</td>
-            <td>${b.date}</td>
-            <td>${b.status}</td>
+            <td>${clientName}</td>
+            <td>${tripDest}</td>
+            <td>${passengers}</td>
+            <td>${phone}</td>
+            <td><span class="status-${b.status}">${b.status}</span></td>
+            <td>${bookingDate}</td>
             <td>
+                ${b.status === 'pending' ? 
+                    `<button class="btn-confirm" onclick="confirmBooking(${b.id})">Confirm</button>` : 
+                    ''}
                 ${b.status !== 'cancelled' ? 
                     `<button class="btn-cancel" onclick="cancelBooking(${b.id})">Cancel</button>` : 
-                    '<span>-</span>'
-                }
+                    ''}
             </td>
         </tr>
-    `).join('');
+        `;
+    }).join('');
+}
+
+async function confirmBooking(id) {
+    if (!confirm('Confirm this booking?')) return;
+    
+    try {
+        await api.confirmBooking(id);
+        loadBookings();
+    } catch (error) {
+        console.error('Error confirming booking:', error);
+        alert('Failed to confirm booking: ' + error.message);
+    }
 }
 
 async function cancelBooking(id) {
@@ -155,25 +336,31 @@ async function cancelBooking(id) {
         loadBookings();
     } catch (error) {
         console.error('Error cancelling booking:', error);
-        alert('Failed to cancel booking. Backend may not be running.');
+        alert('Failed to cancel booking: ' + error.message);
     }
 }
 
 // Analytics
 async function loadAnalytics() {
     try {
+        // Load bookings and voyages first if not already loaded
+        if (!bookings.length) {
+            bookings = await api.getBookings();
+        }
+        if (!voyages.length) {
+            voyages = await api.getVoyages();
+        }
+        
         const analytics = await api.getAnalytics();
         updateAnalyticsDisplay(analytics);
     } catch (error) {
         console.error('Error loading analytics:', error);
-        // Show mock data if backend is not available
-        const mockAnalytics = {
-            total_bookings: 127,
-            active_voyages: 8,
-            total_revenue: 45600,
-            total_conversations: 342
-        };
-        updateAnalyticsDisplay(mockAnalytics);
+        updateAnalyticsDisplay({
+            total_bookings: 0,
+            active_voyages: 0,
+            total_revenue: 0,
+            total_conversations: 0
+        });
     }
 }
 
@@ -183,21 +370,154 @@ function updateAnalyticsDisplay(data) {
     document.getElementById('totalRevenue').textContent = `$${(data.total_revenue || 0).toLocaleString()}`;
     document.getElementById('totalConversations').textContent = data.total_conversations || 0;
     
-    // Simple chart (using HTML/CSS bars)
+    // Draw bookings and revenue charts with real data
+    drawBookingsChart();
+    drawRevenueChart();
+}
+
+function drawBookingsChart() {
     const canvas = document.getElementById('bookingsChart');
     const ctx = canvas.getContext('2d');
     canvas.width = canvas.offsetWidth;
     canvas.height = 200;
     
-    // Draw simple bar chart
-    ctx.fillStyle = '#007bff';
-    const mockData = [10, 15, 12, 18, 22, 30, 28];
-    const barWidth = canvas.width / mockData.length;
-    const maxValue = Math.max(...mockData);
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    mockData.forEach((value, i) => {
-        const barHeight = (value / maxValue) * canvas.height * 0.8;
-        ctx.fillRect(i * barWidth + 5, canvas.height - barHeight, barWidth - 10, barHeight);
+    // Get bookings data grouped by date (last 7 days)
+    const last7Days = [];
+    const bookingCounts = [];
+    const today = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        last7Days.push(dateStr);
+        
+        // Count bookings for this date
+        const count = bookings.filter(b => {
+            if (!b.created_at) return false;
+            const bookingDate = new Date(b.created_at);
+            return bookingDate.toDateString() === date.toDateString();
+        }).length;
+        
+        bookingCounts.push(count);
+    }
+    
+    // Draw chart
+    if (bookingCounts.length === 0 || bookingCounts.every(c => c === 0)) {
+        // No data - show message
+        ctx.fillStyle = '#999';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('No booking data available', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+    
+    const maxValue = Math.max(...bookingCounts, 1);
+    const barWidth = canvas.width / bookingCounts.length;
+    const padding = 40;
+    const chartHeight = canvas.height - padding;
+    
+    ctx.fillStyle = '#007bff';
+    bookingCounts.forEach((value, i) => {
+        const barHeight = (value / maxValue) * chartHeight * 0.8;
+        const x = i * barWidth + 10;
+        const y = chartHeight - barHeight;
+        
+        // Draw bar
+        ctx.fillRect(x, y, barWidth - 20, barHeight);
+        
+        // Draw value on top of bar
+        ctx.fillStyle = '#333';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(value, x + (barWidth - 20) / 2, y - 5);
+        
+        // Draw date label
+        ctx.fillStyle = '#666';
+        ctx.font = '10px Arial';
+        ctx.fillText(last7Days[i], x + (barWidth - 20) / 2, canvas.height - 5);
+        
+        ctx.fillStyle = '#007bff';
+    });
+}
+
+function drawRevenueChart() {
+    const canvas = document.getElementById('revenueChart');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = 200;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Get revenue data grouped by date (last 7 days)
+    const last7Days = [];
+    const revenueByDay = [];
+    const today = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        last7Days.push(dateStr);
+        
+        // Calculate revenue for this date
+        const dayRevenue = bookings
+            .filter(b => {
+                if (!b.created_at || b.status !== 'confirmed') return false;
+                const bookingDate = new Date(b.created_at);
+                return bookingDate.toDateString() === date.toDateString();
+            })
+            .reduce((sum, b) => {
+                // Find the trip to get price
+                const trip = voyages.find(v => v.id === b.trip_id);
+                const tripPrice = trip?.price || 0;
+                const passengers = b.passengers_count || 1;
+                return sum + (tripPrice * passengers);
+            }, 0);
+        
+        revenueByDay.push(dayRevenue);
+    }
+    
+    // Draw chart
+    if (revenueByDay.length === 0 || revenueByDay.every(r => r === 0)) {
+        // No data - show message
+        ctx.fillStyle = '#999';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('No revenue data available', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+    
+    const maxValue = Math.max(...revenueByDay, 1);
+    const barWidth = canvas.width / revenueByDay.length;
+    const padding = 40;
+    const chartHeight = canvas.height - padding;
+    
+    ctx.fillStyle = '#28a745';
+    revenueByDay.forEach((value, i) => {
+        const barHeight = (value / maxValue) * chartHeight * 0.8;
+        const x = i * barWidth + 10;
+        const y = chartHeight - barHeight;
+        
+        // Draw bar
+        ctx.fillRect(x, y, barWidth - 20, barHeight);
+        
+        // Draw value on top of bar
+        ctx.fillStyle = '#333';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`$${value.toLocaleString()}`, x + (barWidth - 20) / 2, y - 5);
+        
+        // Draw date label
+        ctx.fillStyle = '#666';
+        ctx.font = '10px Arial';
+        ctx.fillText(last7Days[i], x + (barWidth - 20) / 2, canvas.height - 5);
+        
+        ctx.fillStyle = '#28a745';
     });
 }
 
