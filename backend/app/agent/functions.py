@@ -6,11 +6,13 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from agent.tools import TOOLS
-from core.config import SYSTEM_PROMPT ,GOOGLE_API_KEY
+from core.config import SYSTEM_PROMPT ,GOOGLE_API_KEY , MISTRAL_API_KEY
 from core.database import SessionLocal
 from services.client import get_or_create_client
 from services.message import get_recent_messages_chronological, log_message
 import time
+from langchain_mistralai import ChatMistralAI
+
 
 class Generate_Response_Exception(Exception):
     pass
@@ -29,7 +31,7 @@ def _execute_tool_call(call: dict) -> str:
     return out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
 
 
-def generate_response(sender_psid: str, text: str) -> str:
+def generate_response(sender_psid: str, text: str , model_choice = "mistral") -> str:
     db = SessionLocal()
     try:
         client = get_or_create_client(db=db, messenger_psid=sender_psid)
@@ -47,18 +49,9 @@ def generate_response(sender_psid: str, text: str) -> str:
 
 
         for _ in range(4):
-            # try calling the llm up to 3 times 
-            iter = 0
-            while iter<3:
-                try:
-                    ai_response = invoke_llm(messages)
-                except Generate_Response_Exception as e:
-                    print(e)
-                    print("trying again in 1 sec")
-                    time.sleep(1)
-                    iter+=1
-            if iter==3:
-                raise Generate_Response_Exception("tool loop exceeded")
+
+            ai_response = invoke_llm(messages , choice = model_choice)
+
 
 
             tool_calls = getattr(ai_response, "tool_calls", None) or []
@@ -101,6 +94,7 @@ def generate_response(sender_psid: str, text: str) -> str:
             for call in tool_calls:
                 result = _execute_tool_call(call)
                 messages.append(ToolMessage(content=result, tool_call_id=call["id"]))
+            time.sleep(1)
 
         raise RuntimeError("tool loop exceeded")
     except Exception as e:
@@ -109,7 +103,27 @@ def generate_response(sender_psid: str, text: str) -> str:
     finally:
         db.close()
 
-def invoke_llm(messages: list[HumanMessage | AIMessage | SystemMessage]) :
-
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3, api_key = GOOGLE_API_KEY).bind_tools(TOOLS)
-    return llm(messages=messages).invoke()
+def invoke_llm(messages: list[HumanMessage | AIMessage | SystemMessage] , choice = "gemini") :
+    if choice == "mistral":
+        resp = generate_with_mistral(messages)
+    else :
+        resp = generate_with_gemini(messages)
+    return resp
+def generate_with_gemini(messages) :
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3, api_key = GOOGLE_API_KEY , max_retries=2).bind_tools(TOOLS)
+    try :
+        response = llm.invoke(messages)
+    except Exception as e:
+        raise Generate_Response_Exception(e)
+    return response
+def generate_with_mistral(messages) :
+    llm = ChatMistralAI(
+        model="mistral-small-2506",
+        temperature=0.3,
+        max_retries=2,
+        api_key = MISTRAL_API_KEY).bind_tools(TOOLS)
+    try :
+        response = llm.invoke(messages)
+    except Exception as e:
+        raise Generate_Response_Exception(e)
+    return response
