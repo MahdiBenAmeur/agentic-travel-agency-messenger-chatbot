@@ -14,13 +14,15 @@ from services.trip import (
 from services.client import (
     get_client_by_psid,
 )
+from services.booking import create_booking, confirm_booking, cancel_booking
+from services.client import update_client
 
 
 @tool
 def tool_list_trips(include_inactive: bool = False, limit: int = 20, offset: int = 0) -> list[dict]:
     """
     List trips with pagination.
-    Returns a list of dicts (JSON-serializable).
+    Returns a list of dicts .
     """
     db = SessionLocal()
     try:
@@ -141,8 +143,6 @@ def tool_get_client_profile(messenger_psid: str) -> dict | None:
         }
     finally:
         db.close()
-from services.booking import create_booking, confirm_booking, cancel_booking
-from services.client import update_client
 
 
 @tool
