@@ -5,8 +5,7 @@ import os
 import requests
 from fastapi import APIRouter, Request, Response
 from agent.functions import generate_response
-VERIFY_TOKEN = "fasgbngdfgshgshfgdgzgxfn855"
-
+from core.config import VERIFY_TOKEN 
 router = APIRouter()
 
 
@@ -96,12 +95,14 @@ async def receive_webhook(request: Request):
     extracted = extract_message_event(payload)
     if not extracted:
         return Response(status_code=200)
-
-    sender_psid, text = extracted
-    send_mark_seen(recipient_psid=sender_psid)
-    send_typing_on(recipient_psid=sender_psid)
-    response = generate_response(sender_psid,text)
-    send_text_message(recipient_psid=sender_psid, text=response)
-    send_typing_off(recipient_psid=sender_psid)
+    try :
+        sender_psid, text = extracted
+        send_mark_seen(recipient_psid=sender_psid)
+        send_typing_on(recipient_psid=sender_psid)
+        response = generate_response(sender_psid,text)
+        send_text_message(recipient_psid=sender_psid, text=response)
+        send_typing_off(recipient_psid=sender_psid)
+    except Exception as e:
+        print(e)
 
     return Response(status_code=200)

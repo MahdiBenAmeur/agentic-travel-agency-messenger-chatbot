@@ -6,17 +6,22 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from agent.tools import TOOLS
-from core.config import SYSTEM_PROMPT
+from core.config import SYSTEM_PROMPT ,GOOGLE_API_KEY
 from core.database import SessionLocal
 from services.client import get_or_create_client
 from services.message import get_recent_messages_chronological, log_message
 import time
 
+class Generate_Response_Exception(Exception):
+    pass
+
+
+tool_map = {t.name: t for t in TOOLS}
 def _execute_tool_call(call: dict) -> str:
     name = call["name"]
     args = call.get("args") or {}
 
-    tool_map = {t.name: t for t in TOOLS}
+    
     if name not in tool_map:
         return json.dumps({"error": f"unknown tool {name}"}, ensure_ascii=False)
 
@@ -40,15 +45,25 @@ def generate_response(sender_psid: str, text: str) -> str:
 
         messages.append(HumanMessage(content=text))
 
-        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3).bind_tools(TOOLS)
 
         for _ in range(4):
-            time.sleep(1)
-            ai = llm.invoke(messages)
+            # try calling the llm up to 3 times 
+            iter = 0
+            while iter<3:
+                try:
+                    ai_response = invoke_llm(messages)
+                except Generate_Response_Exception as e:
+                    print(e)
+                    print("trying again in 1 sec")
+                    time.sleep(1)
+                    iter+=1
+            if iter==3:
+                raise Generate_Response_Exception("tool loop exceeded")
 
-            tool_calls = getattr(ai, "tool_calls", None) or []
+
+            tool_calls = getattr(ai_response, "tool_calls", None) or []
             if not tool_calls:
-                content = getattr(ai, "content", "")
+                content = getattr(ai_response, "content", "")
 
                 if isinstance(content, str):
                     reply = content.strip()
@@ -81,7 +96,7 @@ def generate_response(sender_psid: str, text: str) -> str:
 
                 return reply
 
-            messages.append(ai)
+            messages.append(ai_response)
 
             for call in tool_calls:
                 result = _execute_tool_call(call)
@@ -93,3 +108,8 @@ def generate_response(sender_psid: str, text: str) -> str:
         return "Sorry, issue handeling response , will get back to you soon"
     finally:
         db.close()
+
+def invoke_llm(messages: list[HumanMessage | AIMessage | SystemMessage]) :
+
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3, api_key = GOOGLE_API_KEY).bind_tools(TOOLS)
+    return llm(messages=messages).invoke()
