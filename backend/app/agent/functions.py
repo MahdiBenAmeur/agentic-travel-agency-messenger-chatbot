@@ -92,6 +92,7 @@ def generate_response(sender_psid: str, text: str , model_choice = "mistral") ->
             messages.append(ai_response)
 
             for call in tool_calls:
+                print(call)
                 result = _execute_tool_call(call)
                 messages.append(ToolMessage(content=result, tool_call_id=call["id"]))
             time.sleep(1)

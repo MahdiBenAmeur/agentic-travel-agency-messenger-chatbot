@@ -7,12 +7,12 @@ from fastapi import APIRouter, Request, Response
 from agent.functions import generate_response
 from core.config import VERIFY_TOKEN 
 router = APIRouter()
-
+treated_messages = set()
 
 def extract_message_event(payload: dict) -> tuple[str, str] | None:
     if payload.get("object") != "page":
         return None
-
+    
     entries = payload.get("entry") or []
     for entry in entries:
         messaging = entry.get("messaging") or []
@@ -88,10 +88,13 @@ async def verify_webhook(request: Request):
     return Response(status_code=403)
 
 
+
 @router.post("/webhook")
 async def receive_webhook(request: Request):
     payload = await request.json()
-
+    
+    if treaded(payload):
+        return Response(status_code=200)
     extracted = extract_message_event(payload)
     if not extracted:
         return Response(status_code=200)
@@ -104,5 +107,32 @@ async def receive_webhook(request: Request):
         send_typing_off(recipient_psid=sender_psid)
     except Exception as e:
         print(e)
-
+    treated_messages.add(get_message_id(payload))
     return Response(status_code=200)
+
+def treaded(payload):
+    """
+    check if the payload contains a message and if the message has been treated or not if yes return true
+    """
+    message_id = get_message_id(payload)
+    if not message_id:
+        return False
+    
+    return message_id in treated_messages
+
+def get_message_id(payload):
+    """
+    get the message id from the payload
+    """
+    
+    if not isinstance(payload, dict):
+        return None
+
+    message = payload.get("message")
+    if not isinstance(message, dict):
+        return None
+
+    message_id = message.get("mid")
+    if not isinstance(message_id, str):
+        return None
+    return message_id

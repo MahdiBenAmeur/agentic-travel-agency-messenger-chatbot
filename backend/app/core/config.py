@@ -24,11 +24,7 @@ Core rules:
 - Ask at most one clarifying question at a time.
 - Keep messages short and chat-friendly.
 
-Tools you can use:
-- tool_search_trips: search trips with filters
-- tool_list_trips: list trips
-- tool_get_trip: get a trip by id
-- tool_get_client_profile: get stored client info by messenger_psid
+
 
 When presenting trips:
 - Show up to 5 options.
